@@ -61,6 +61,8 @@ class WhisperServer:
         self.port = 0
         self.proc: subprocess.Popen | None = None
         self.gpu: int | None = None
+        self.last_used = time.time()
+        self.in_flight = 0
         self._lock = threading.Lock()
         self._log_tail: list[str] = []
 
@@ -97,6 +99,7 @@ class WhisperServer:
             self.proc = subprocess.Popen(config.supervised(cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             threading.Thread(target=self._drain, daemon=True).start()
             self._wait_ready()
+            self.last_used = time.time()
 
     def _drain(self) -> None:
         assert self.proc and self.proc.stdout
@@ -127,6 +130,7 @@ class WhisperServer:
                 except subprocess.TimeoutExpired:
                     self.proc.kill()
             self.proc = None
+            self.last_used = time.time()
 
     def transcribe(
         self,
@@ -140,6 +144,7 @@ class WhisperServer:
         """Transcribe float32 16 kHz mono audio. Returns (segments, detected language)."""
         if not self.running():
             self.start()
+        self.last_used = time.time()
         form = {
             "response_format": "verbose_json",
             "language": language or "auto",
@@ -152,7 +157,12 @@ class WhisperServer:
         if prompt:
             form["prompt"] = prompt
         files = {"file": ("audio.wav", wav_bytes(samples), "audio/wav")}
-        r = httpx.post(self.url + "/inference", data=form, files=files, timeout=timeout)
+        self.in_flight += 1
+        try:
+            r = httpx.post(self.url + "/inference", data=form, files=files, timeout=timeout)
+        finally:
+            self.in_flight -= 1
+            self.last_used = time.time()
         r.raise_for_status()
         data = r.json()
         if "error" in data:
@@ -256,6 +266,9 @@ def drop_repeats(segments: list[Segment], lookback: int = 4, window_s: float = 9
     return out
 
 
+IDLE_UNLOAD_S = 600  # free GPU/RAM after 10 minutes without use; reloading takes a few seconds
+
+
 class WhisperPool:
     """One server for everything, or a separate (smaller) one for live captions."""
 
@@ -263,6 +276,15 @@ class WhisperPool:
         self._final: WhisperServer | None = None
         self._live: WhisperServer | None = None
         self._lock = threading.Lock()
+        threading.Thread(target=self._reap_idle, name="whisper-idle", daemon=True).start()
+
+    def _reap_idle(self) -> None:
+        while True:
+            time.sleep(30)
+            for srv in (self._final, self._live):
+                if srv and srv.running() and not srv.in_flight and time.time() - srv.last_used > IDLE_UNLOAD_S:
+                    log.info("unloading idle whisper model %s", srv.model)
+                    srv.stop()
 
     def final(self) -> WhisperServer:
         with self._lock:

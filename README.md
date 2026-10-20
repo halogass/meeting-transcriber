@@ -24,6 +24,7 @@ your voice is labelled with your name and the remote participants are separated 
 - Optional auto-recording: starts when a call app opens the microphone, stops when the call ends
 - Upload any existing audio/video file to transcribe it with all speakers separated
 - Uses two GPUs when present (whisper on one, pyannote on the other); falls back to one GPU or CPU
+- Plays nicely on shared machines: models are released after 10 idle minutes (Whisper) or right after use (pyannote, Ollama)
 
 ## Requirements
 
