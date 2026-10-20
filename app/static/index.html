@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meeting Transcriber</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23e5484d'/><rect x='13' y='8' width='6' height='11' rx='3' fill='white'/><path d='M10 16a6 6 0 0 0 12 0' stroke='white' stroke-width='2' fill='none'/><path d='M16 22v3' stroke='white' stroke-width='2'/></svg>">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span>Meeting Transcriber</span>
+      </div>
+      <div class="side-actions">
+        <a class="btn btn-primary btn-block" href="#/">New meeting</a>
+        <button class="btn btn-block" id="uploadBtn" type="button">Upload recording</button>
+      </div>
+      <div class="search">
+        <input id="search" type="search" placeholder="Search meetings…" autocomplete="off">
+      </div>
+      <nav class="meeting-list" id="meetingList" aria-label="Meetings"></nav>
+      <div class="side-footer">
+        <a href="#/settings" class="side-link" id="settingsLink">Settings</a>
+        <div class="sys" id="sysStatus"></div>
+      </div>
+    </aside>
+
+    <main class="main" id="main"></main>
+  </div>
+
+  <dialog id="uploadDialog" class="dialog">
+    <form method="dialog" id="uploadForm">
+      <h2>Upload a recording</h2>
+      <p class="muted">Any audio or video file. Every voice is separated into speakers.</p>
+      <label class="field"><span>File</span><input type="file" name="file" accept="audio/*,video/*" required></label>
+      <label class="field"><span>Title</span><input type="text" name="title" placeholder="Optional"></label>
+      <div class="dialog-actions">
+        <button class="btn" value="cancel" formnovalidate>Cancel</button>
+        <button class="btn btn-primary" value="ok" id="uploadSubmit">Upload</button>
+      </div>
+      <div class="upload-progress" hidden><div class="bar"><span></span></div><small class="muted">Uploading…</small></div>
+    </form>
+  </dialog>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
