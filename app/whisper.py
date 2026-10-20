@@ -94,7 +94,7 @@ class WhisperServer:
             else:
                 cmd += ["-dev", str(self.gpu)]
             log.info("starting whisper-server: %s", " ".join(cmd))
-            self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            self.proc = subprocess.Popen(config.supervised(cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             threading.Thread(target=self._drain, daemon=True).start()
             self._wait_ready()
 

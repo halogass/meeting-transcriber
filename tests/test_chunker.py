@@ -55,3 +55,4 @@ def test_split_long_audio_covers_everything():
 def test_split_short_audio_is_single_window():
     audio = tone(60)
     assert split_long_audio(audio) == [(0, len(audio))]
+

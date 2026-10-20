@@ -109,6 +109,7 @@ def _ollama(prompt: str, system: str = SYSTEM) -> str:
                 "stream": False,
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
                 "options": {"num_ctx": 16384},
+                "keep_alive": 0,  # unload right after: the GPU is needed for transcription
             },
             timeout=1800,
         )

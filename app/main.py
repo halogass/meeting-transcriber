@@ -261,7 +261,8 @@ def patch_segment(mid: str, patch: SegmentPatch):
 @app.delete("/api/meetings/{mid}")
 def delete_meeting(mid: str):
     meta = _meta_or_404(mid)
-    if meta["status"] in ("recording", "processing") or (recorder.current and recorder.current.id == mid):
+    busy = meta["status"] in ("recording", "processing") or meta.get("summary_status") == "running"
+    if busy or jobs.current == mid or (recorder.current and recorder.current.id == mid):
         raise HTTPException(409, "Meeting is still recording or processing")
     storage.delete(mid)
     return {"ok": True}
@@ -362,13 +363,25 @@ async def ws(websocket: WebSocket):
             return
     await websocket.accept()
     q = bus.subscribe()
-    try:
+
+    async def pump():
         while True:
-            event = await q.get()
-            await websocket.send_json(event)
-    except (WebSocketDisconnect, asyncio.CancelledError, RuntimeError):
+            await websocket.send_json(await q.get())
+
+    async def watch():  # returns when the client goes away
+        while True:
+            msg = await websocket.receive()
+            if msg["type"] == "websocket.disconnect":
+                return
+
+    tasks = [asyncio.create_task(pump()), asyncio.create_task(watch())]
+    try:
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+    except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
+        for t in tasks:
+            t.cancel()
         bus.unsubscribe(q)
 
 

@@ -101,7 +101,9 @@ class Capture:
             f"--client-name={CLIENT_NAME}",
             "--stream-name=capture",
         ]
-        self._proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        from .config import supervised
+
+        self._proc = subprocess.Popen(supervised(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self._thread = threading.Thread(target=self._run, name=f"capture-{self.source}", daemon=True)
         self._thread.start()
 

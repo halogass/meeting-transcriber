@@ -122,6 +122,26 @@ def save_settings(update: dict) -> Settings:
     return _settings
 
 
+_WATCHDOG = r"""
+"$@" &
+child=$!
+trap 'kill $child 2>/dev/null; wait $child; exit' TERM INT
+while kill -0 "$child" 2>/dev/null; do
+  kill -0 "$MT_PARENT_PID" 2>/dev/null || { kill "$child"; break; }
+  sleep 1
+done
+wait "$child"
+"""
+
+
+def supervised(cmd: list[str]) -> list[str]:
+    """Wrap a child command so it is stopped when the app process goes away, even after
+    `kill -9` or a crash: a GPU-holding whisper-server must never outlive the app.
+    Terminating the wrapper (Popen.terminate) also stops the child. Needs MT_PARENT_PID."""
+    os.environ["MT_PARENT_PID"] = str(os.getpid())
+    return ["bash", "-c", _WATCHDOG, "watchdog", *cmd]
+
+
 def hf_token() -> str | None:
     s = load_settings()
     if s.hf_token:
