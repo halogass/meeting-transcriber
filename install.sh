@@ -105,9 +105,9 @@ mkdir -p data
 if [ ! -f data/settings.json ]; then
   NAME="$(getent passwd "$USER" | cut -d: -f5 | cut -d, -f1)"; NAME="${NAME:-$USER}"
   HF=""
-  if [ ! -f "$HOME/.cache/huggingface/token" ] && [ -z "${HF_TOKEN:-}" ] && [ "$YES" = 0 ]; then
+  if [ -z "${HF_TOKEN:-}" ] && [ "$YES" = 0 ]; then
     echo "Speaker identification uses pyannote, which needs a free Hugging Face token:"
-    echo "  1. https://huggingface.co/settings/tokens  (create a 'read' token)"
+    echo "  1. https://huggingface.co/settings/tokens  (create a token of type 'Read')"
     echo "  2. https://huggingface.co/pyannote/speaker-diarization-community-1  (accept the terms)"
     read -r -p "Paste the token (or press Enter to add it later in Settings): " HF || true
   fi

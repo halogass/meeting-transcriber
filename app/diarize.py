@@ -27,14 +27,15 @@ class DiarizationError(RuntimeError):
     pass
 
 
-def _account(token: str) -> str:
-    """Name of the Hugging Face account a token belongs to (for error messages)."""
+def _token_info(token: str) -> tuple[str, str]:
+    """(account name, token type) for error messages; ("", "") if unknown."""
     try:
         from huggingface_hub import whoami
 
-        return f'"{whoami(token=token)["name"]}"'
+        info = whoami(token=token)
+        return info.get("name", ""), (info.get("auth") or {}).get("type", "")
     except Exception:
-        return "for this token"
+        return "", ""
 
 
 def _load_pipeline(device: str):
@@ -50,8 +51,16 @@ def _load_pipeline(device: str):
     except Exception as e:  # gated repo, bad token, offline...
         msg = str(e)
         if "403" in msg or "gated" in msg.lower() or "restricted" in msg.lower():
+            name, kind = _token_info(token)
+            who = f'"{name}"' if name else "for this token"
+            if kind == "oauth":
+                raise DiarizationError(
+                    f"The Hugging Face token is a temporary login (OAuth) token for {who}, which cannot read "
+                    f"gated models. Create a 'Read' access token at https://huggingface.co/settings/tokens "
+                    f"and paste it in Settings."
+                ) from e
             raise DiarizationError(
-                f"The Hugging Face account {_account(token)} has no access to {s.diarization_model} yet. "
+                f"The Hugging Face account {who} has no access to {s.diarization_model} yet. "
                 f"Log in to huggingface.co as that account, open https://huggingface.co/{s.diarization_model} "
                 f"and accept the terms (or use a token from the account that accepted them)."
             ) from e

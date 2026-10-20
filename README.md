@@ -44,8 +44,8 @@ cd meeting-transcriber
 The installer installs missing system packages (asks first), builds whisper.cpp (CUDA if available), downloads
 the models, sets up the Python environment with [uv](https://docs.astral.sh/uv/) and adds an app-menu entry.
 
-**One-time step for speaker identification:** create a read token at
-<https://huggingface.co/settings/tokens> and accept the model terms at
+**One-time step for speaker identification:** create a **Read** access token at
+<https://huggingface.co/settings/tokens> (a browser `hf auth login` OAuth token can't read gated models) and accept the model terms at
 <https://huggingface.co/pyannote/speaker-diarization-community-1>. Paste the token when the installer asks,
 or later in **Settings**.
 
