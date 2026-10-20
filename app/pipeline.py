@@ -21,7 +21,7 @@ from .config import SAMPLE_RATE
 from .diarize import Turn, diarize
 from .events import bus
 from .merge import ME, build_transcript, speakers_in
-from .whisper import Segment, is_hallucination, pool
+from .whisper import Segment, drop_repeats, is_hallucination, pool
 
 log = logging.getLogger(__name__)
 
@@ -33,14 +33,15 @@ def _rms(x: np.ndarray) -> float:
 
 
 def transcribe_full(samples: np.ndarray, progress) -> tuple[list[Segment], str]:
-    """Transcribe a long recording in ~5 minute windows (progress + bounded memory)."""
+    """Transcribe a long recording in ~3 minute windows (progress + bounded memory)."""
     s = config.load_settings()
     server = pool.final()
-    windows = split_long_audio(samples)
+    windows = split_long_audio(samples, target_s=180.0)
     total = len(samples) or 1
     out: list[Segment] = []
     langs: dict[str, int] = {}
     for a, b in windows:
+        progress(max(a / total, 0.01))  # also marks this step as started in the UI
         piece = samples[a:b]
         if _rms(piece) < SILENT_RMS:
             progress(b / total)
@@ -62,7 +63,7 @@ def transcribe_full(samples: np.ndarray, progress) -> tuple[list[Segment], str]:
             langs[lang] = langs.get(lang, 0) + (b - a)
         progress(b / total)
     main_lang = max(langs, key=langs.get) if langs else ""
-    return out, main_lang
+    return drop_repeats(out), main_lang
 
 
 class Progress:
@@ -92,6 +93,7 @@ class Progress:
 def process(mid: str) -> None:
     d = storage.meeting_dir(mid)
     meta = storage.update_meta(mid, status="processing", progress=0.0, stage="loading audio", error=None)
+    pool.final().start()  # load the model first (can take a while on the first run)
     bus.publish({"type": "status", "meeting": mid, "status": "processing"})
     s = config.load_settings()
 

@@ -29,6 +29,7 @@ def test_srt():
 def test_md_with_summary():
     md = export.to_md(META, SEGS, "## Summary\nAll good.")
     assert md.startswith("# Weekly sync")
+    assert "## Meeting notes" in md and "### Summary" in md
     assert "## Transcript" in md and "**Hilmy**" in md
 
 
@@ -39,3 +40,10 @@ def test_docx_opens():
     doc = Document(io.BytesIO(data))
     text = "\n".join(p.text for p in doc.paragraphs)
     assert "Weekly sync" in text and "Selamat pagi." in text and "send report" in text
+
+
+def test_summary_tidy_drops_empty_sections():
+    from app.summarize import tidy
+
+    md = "## Summary\nAll good.\n\n## Decisions\n- None recorded.\n## Open questions\n"
+    assert tidy(md) == "## Summary\nAll good.\n\n## Decisions\n- None recorded."

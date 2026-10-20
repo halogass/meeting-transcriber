@@ -378,7 +378,8 @@ async function loadMeeting(id, keepTab = false) {
     location.hash = `#/live/${id}`;
     return;
   }
-  const prevTab = keepTab && state.meeting?.meta.id === id ? state.meeting.tab : null;
+  let prevTab = keepTab && state.meeting?.meta.id === id ? state.meeting.tab : null;
+  if (prevTab === "live" && data.transcript && !state.meeting.transcript) prevTab = "transcript"; // just finished
   const audio = $("#audio");
   const resume = keepTab && audio ? { t: audio.currentTime, playing: !audio.paused } : null;
   state.meeting = { ...data, tab: prevTab || (data.transcript ? "transcript" : "live") };
@@ -431,7 +432,7 @@ function renderMeeting() {
     <div class="m-sub">
       <span>${dateLabel(meta.created_at)}</span>
       ${meta.duration ? `<span>· ${duration(meta.duration)}</span>` : ""}
-      ${meta.language ? `<span>· ${esc(langNames[meta.language] || meta.language)}</span>` : ""}
+      ${meta.language ? `<span>· ${esc(langNames[meta.language] || meta.language.charAt(0).toUpperCase() + meta.language.slice(1))}</span>` : ""}
       ${meta.mode === "upload" ? "<span>· uploaded</span>" : ""}
       ${badge(meta.status)}
     </div>

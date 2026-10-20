@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Download whisper.cpp GGML models and the Silero VAD model.
 #
-#   scripts/download_models.sh                       # large-v3-turbo (GPU default)
+#   scripts/download_models.sh                       # large-v3-turbo-q5_0 (default)
 #   scripts/download_models.sh large-v3-turbo-q5_0 small
 set -euo pipefail
 
@@ -10,7 +10,7 @@ DIR="$ROOT/models"
 mkdir -p "$DIR"
 
 MODELS=("$@")
-[ ${#MODELS[@]} -eq 0 ] && MODELS=(large-v3-turbo)
+[ ${#MODELS[@]} -eq 0 ] && MODELS=(large-v3-turbo-q5_0)
 
 fetch() {
   local url="$1" dest="$2"

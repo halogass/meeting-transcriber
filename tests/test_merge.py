@@ -76,3 +76,29 @@ def test_hallucination_filter():
     assert not is_hallucination(seg(0, 1, "Terima kasih."), energy=0.1)
     assert is_hallucination(seg(0, 5, "ya ya ya ya ya ya ya ya ya"))
     assert not is_hallucination(seg(0, 2, "Kita mulai rapatnya sekarang."))
+
+
+def _words(sentence, start, step=0.3):
+    toks = sentence.split()
+    return [Word(" " + t, start + i * step, start + (i + 1) * step) for i, t in enumerate(toks)]
+
+
+def test_drop_repeats_removes_whisper_loops():
+    from app.whisper import drop_repeats
+
+    loop = "Nanti kita bahas lagi jadwal rapat minggu depan."
+    w = _words(loop, 10) + _words(loop, 13) + _words("Lalu topik berikutnya.", 16)
+    segs = [
+        seg(0, 3, "Selamat pagi semuanya.", _words("Selamat pagi semuanya.", 0)),
+        seg(10, 18, f"{loop} {loop} Lalu topik berikutnya.", w),
+        seg(20, 23, loop, _words(loop, 20)),
+    ]
+    out = drop_repeats(segs)
+    assert [s.text for s in out] == ["Selamat pagi semuanya.", f"{loop} Lalu topik berikutnya."]
+
+
+def test_drop_repeats_keeps_short_repeated_replies():
+    from app.whisper import drop_repeats
+
+    segs = [seg(0, 1, "Ya."), seg(2, 3, "Ya."), seg(4, 5, "Oke, siap.")]
+    assert len(drop_repeats(segs)) == 3

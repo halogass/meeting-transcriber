@@ -7,7 +7,7 @@ shows **live captions** while you talk, and when you press Stop produces a **ref
 your voice is labelled with your name and the remote participants are separated by voice
 (Speaker 1, Speaker 2, … which you can rename). Then it can write a **summary with action items**.
 
-- Speech recognition: [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (large-v3-turbo, multilingual, handles mixed Indonesian/English)
+- Speech recognition: [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (large-v3-turbo, 5-bit quantized; multilingual, handles mixed Indonesian/English)
 - Speaker identification: [pyannote.audio](https://github.com/pyannote/pyannote-audio) (`speaker-diarization-community-1`)
 - Summaries: Claude (Anthropic API) or any local [Ollama](https://ollama.com) model
 - Everything except Claude summaries runs on your machine. Audio never leaves it.
@@ -88,7 +88,10 @@ Environment variables:
 | `MT_DATA_DIR` / `MT_MODELS_DIR` | `./data` / `./models` | Storage locations |
 | `MT_FORCE_CPU` | empty | Ignore GPUs |
 
-More Whisper models: `scripts/download_models.sh medium small-q5_1 large-v3` then pick them in Settings.
+More Whisper models: `scripts/download_models.sh large-v3-turbo small-q5_1 large-v3` then pick them in Settings.
+
+**Speed** (GTX 1660 SUPER, 6 GB): the default `large-v3-turbo-q5_0` transcribes about 9x faster than real time
+(a 1-hour meeting in ~7 minutes); the full-precision `large-v3-turbo` gave the same words but was 2.5x slower.
 
 ## How it works
 

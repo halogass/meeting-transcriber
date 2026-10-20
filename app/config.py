@@ -35,7 +35,7 @@ class Settings:
 
     # Transcription
     language: str = "auto"
-    whisper_model: str = "ggml-large-v3-turbo.bin"
+    whisper_model: str = "ggml-large-v3-turbo-q5_0.bin"
     live_model: str = ""  # "" = same as whisper_model (one server)
     whisper_device: str = "auto"  # "auto" | "cpu" | GPU index such as "0"
     whisper_threads: int = 4

@@ -3,7 +3,7 @@
 set -euo pipefail
 cd /app
 
-FINAL="${MT_WHISPER_MODEL:-large-v3-turbo}"
+FINAL="${MT_WHISPER_MODEL:-large-v3-turbo-q5_0}"
 LIVE="${MT_LIVE_MODEL:-}"
 scripts/download_models.sh "$FINAL" ${LIVE:+"$LIVE"}
 

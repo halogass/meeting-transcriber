@@ -34,7 +34,7 @@ def to_md(meta: dict, segments: list[dict], summary: str | None = None) -> str:
     title, sub = _header(meta)
     out = [f"# {title}", "", f"_{sub}_", ""]
     if summary:
-        out += ["## Summary", "", summary.strip(), "", "## Transcript", ""]
+        out += ["## Meeting notes", "", _demote(summary.strip()), "", "## Transcript", ""]
     for s in segments:
         out.append(f'**{_name(meta, s["speaker"])}** `{ts(s["start"])}`  ')
         out.append(s["text"])
@@ -60,7 +60,7 @@ def to_docx(meta: dict, segments: list[dict], summary: str | None = None) -> byt
     p.runs[0].font.color.rgb = RGBColor(0x66, 0x66, 0x66)
 
     if summary:
-        doc.add_heading("Summary", level=1)
+        doc.add_heading("Meeting notes", level=1)
         for line in summary.strip().splitlines():
             line = line.rstrip()
             if not line:
@@ -86,5 +86,13 @@ def to_docx(meta: dict, segments: list[dict], summary: str | None = None) -> byt
     return buf.getvalue()
 
 
+def _demote(md: str) -> str:
+    """Nest the summary's own headings under "Meeting notes"."""
+    return "\n".join("#" + line if line.startswith("#") else line for line in md.splitlines())
+
+
 def _strip_md(text: str) -> str:
-    return text.replace("**", "").replace("__", "").replace("`", "")
+    text = text.replace("**", "").replace("__", "").replace("`", "")
+    if text.startswith(("[ ] ", "[x] ", "[X] ")):
+        text = ("☐ " if text[1] == " " else "☑ ") + text[4:]
+    return text

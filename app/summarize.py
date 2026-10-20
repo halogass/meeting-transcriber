@@ -48,6 +48,19 @@ class SummaryError(RuntimeError):
     pass
 
 
+def tidy(md: str) -> str:
+    """Drop headings with nothing under them (models often keep an empty optional section)."""
+    lines = md.strip().splitlines()
+    out: list[str] = []
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("#"):
+            rest = next((l for l in lines[i + 1 :] if l.strip()), "")
+            if not rest or rest.lstrip().startswith("#"):
+                continue
+        out.append(line)
+    return "\n".join(out).strip()
+
+
 def _claude(prompt: str) -> str:
     import anthropic
 
@@ -161,6 +174,7 @@ def summarize_meeting(mid: str) -> str:
         storage.update_meta(mid, summary_status="error", summary_error=str(e))
         bus.publish({"type": "summary", "meeting": mid, "status": "error", "error": str(e)})
         raise
+    text = tidy(text)
     storage.write_summary(mid, text)
     storage.update_meta(mid, summary_status="done", summary_error=None)
     bus.publish({"type": "summary", "meeting": mid, "status": "done"})

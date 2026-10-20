@@ -19,7 +19,7 @@ x-common: &common
     HF_TOKEN: ${HF_TOKEN:-}
     ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     MT_PASSWORD: ${MT_PASSWORD:-}
-    MT_WHISPER_MODEL: ${MT_WHISPER_MODEL:-large-v3-turbo}
+    MT_WHISPER_MODEL: ${MT_WHISPER_MODEL:-large-v3-turbo-q5_0}
     MT_LIVE_MODEL: ${MT_LIVE_MODEL:-}
     # PULSE_SERVER: unix:/run/pulse/native
 

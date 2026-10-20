@@ -206,6 +206,56 @@ def is_hallucination(seg: Segment, energy: float | None = None) -> bool:
     return False
 
 
+def _norm(text: str) -> str:
+    return " ".join("".join(c for c in text.lower() if c.isalnum() or c.isspace()).split())
+
+
+def _sentences(seg: Segment) -> list[list[Word]]:
+    out, cur = [], []
+    for w in seg.words:
+        cur.append(w)
+        if w.text.rstrip().endswith((".", "?", "!")):
+            out.append(cur)
+            cur = []
+    if cur:
+        out.append(cur)
+    return out
+
+
+def drop_repeats(segments: list[Segment], lookback: int = 4, window_s: float = 90.0) -> list[Segment]:
+    """Remove Whisper's repetition loops: a sentence or segment that just repeats the
+    previous one(s) word for word. Real speech rarely repeats a whole sentence verbatim."""
+    out: list[Segment] = []
+    recent: list[tuple[float, str]] = []  # (end time, normalized sentence)
+
+    def seen(text: str, t: float) -> bool:
+        n = _norm(text)
+        return len(n) >= 12 and any(n == r and t - end <= window_s for end, r in recent[-lookback:])
+
+    for seg in segments:
+        if seg.words:
+            kept_words: list[Word] = []
+            for sent in _sentences(seg):
+                text = "".join(w.text for w in sent)
+                if seen(text, sent[0].start):
+                    continue
+                kept_words += sent
+                recent.append((sent[-1].end, _norm(text)))
+            if not kept_words:
+                continue
+            if len(kept_words) != len(seg.words):
+                seg.words = kept_words
+                seg.text = " ".join("".join(w.text for w in kept_words).split())
+                seg.start, seg.end = kept_words[0].start, kept_words[-1].end
+            out.append(seg)
+        else:
+            if seen(seg.text, seg.start):
+                continue
+            recent.append((seg.end, _norm(seg.text)))
+            out.append(seg)
+    return out
+
+
 class WhisperPool:
     """One server for everything, or a separate (smaller) one for live captions."""
 
