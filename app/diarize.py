@@ -27,6 +27,16 @@ class DiarizationError(RuntimeError):
     pass
 
 
+def _account(token: str) -> str:
+    """Name of the Hugging Face account a token belongs to (for error messages)."""
+    try:
+        from huggingface_hub import whoami
+
+        return f'"{whoami(token=token)["name"]}"'
+    except Exception:
+        return "for this token"
+
+
 def _load_pipeline(device: str):
     import torch
     from pyannote.audio import Pipeline
@@ -41,8 +51,9 @@ def _load_pipeline(device: str):
         msg = str(e)
         if "403" in msg or "gated" in msg.lower() or "restricted" in msg.lower():
             raise DiarizationError(
-                f"Access to {s.diarization_model} is not granted for this Hugging Face token. "
-                f"Open https://huggingface.co/{s.diarization_model} and accept the terms."
+                f"The Hugging Face account {_account(token)} has no access to {s.diarization_model} yet. "
+                f"Log in to huggingface.co as that account, open https://huggingface.co/{s.diarization_model} "
+                f"and accept the terms (or use a token from the account that accepted them)."
             ) from e
         raise DiarizationError(f"Could not load {s.diarization_model}: {msg}") from e
     if pipeline is None:
