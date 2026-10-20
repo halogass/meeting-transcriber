@@ -27,6 +27,13 @@ log = logging.getLogger(__name__)
 
 SILENT_RMS = 0.002  # a stream quieter than this is treated as empty
 
+# A short, well-punctuated example sets the transcript style for the first window.
+SEED_PROMPT = {
+    "auto": "Baik, kita mulai rapatnya. Okay, let's get started.",
+    "id": "Baik, kita mulai rapatnya sekarang.",
+    "en": "Okay, let's get started with the meeting.",
+}
+
 
 def _rms(x: np.ndarray) -> float:
     return float(np.sqrt(np.mean(x**2))) if len(x) else 0.0
@@ -46,7 +53,10 @@ def transcribe_full(samples: np.ndarray, progress) -> tuple[list[Segment], str]:
         if _rms(piece) < SILENT_RMS:
             progress(b / total)
             continue
-        segs, lang = server.transcribe(piece, language=s.language, vad=True, words=True)
+        # The previous window's last words keep punctuation, casing and names consistent;
+        # without them Whisper sometimes restarts a window in lowercase without punctuation.
+        prompt = " ".join(seg.text for seg in out[-3:])[-220:] if out else SEED_PROMPT.get(s.language, SEED_PROMPT["auto"])
+        segs, lang = server.transcribe(piece, language=s.language, vad=True, words=True, prompt=prompt)
         offset = a / SAMPLE_RATE
         for seg in segs:
             st, en = int(seg.start * SAMPLE_RATE), int(seg.end * SAMPLE_RATE)

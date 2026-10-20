@@ -43,7 +43,7 @@ def test_merge_paragraphs_joins_same_speaker():
         {"start": 0, "end": 2, "speaker": "A", "text": "one"},
         {"start": 2.5, "end": 4, "speaker": "A", "text": "two"},
         {"start": 4.2, "end": 5, "speaker": "B", "text": "three"},
-        {"start": 9, "end": 10, "speaker": "B", "text": "four"},
+        {"start": 10, "end": 11, "speaker": "B", "text": "four"},
     ]
     out = merge_paragraphs(items)
     assert [(o["speaker"], o["text"]) for o in out] == [("A", "one two"), ("B", "three"), ("B", "four")]
@@ -102,3 +102,40 @@ def test_drop_repeats_keeps_short_repeated_replies():
 
     segs = [seg(0, 1, "Ya."), seg(2, 3, "Ya."), seg(4, 5, "Oke, siap.")]
     assert len(drop_repeats(segs)) == 3
+
+
+def test_vad_word_times_are_mapped_onto_segment():
+    data = {"segments": [{"start": 10.0, "end": 12.0, "text": " Hello there.",
+                          "words": [{"word": " Hello", "start": 0.5, "end": 1.0, "t_dtw": 60},
+                                    {"word": " there", "start": 1.0, "end": 1.4, "t_dtw": 110},
+                                    {"word": ".", "start": 1.4, "end": 1.5, "t_dtw": 140}]}]}
+    seg = parse_segments(data, vad=True)[0]
+    assert [w.text for w in seg.words] == [" Hello", " there."]  # punctuation joined to the word
+    assert 10.0 <= seg.words[0].start < seg.words[1].start <= 12.0
+    assert abs(seg.words[0].start - 10.2) < 0.05  # DTW time 0.6 mapped from [0.5, 1.5] onto [10, 12]
+
+
+def test_smooth_labels_absorbs_short_islands_and_snaps_to_sentence_end():
+    from app.merge import smooth_labels
+
+    w = _words("I will tell you this manager's name. Okay great.", 0, 0.3)
+    # timing noise: "tell you" labelled B, and the change to B happens one word late
+    labels = ["A", "A", "B", "B", "A", "A", "A", "A", "B"]
+    out = smooth_labels(w, labels)
+    assert out == ["A"] * 7 + ["B", "B"]
+
+
+def test_smooth_labels_keeps_real_interjections():
+    from app.merge import smooth_labels
+
+    w = _words("We start Monday. Okay, noted. Then we test.", 0, 0.3)
+    labels = ["A", "A", "A", "B", "B", "A", "A", "A"]  # "Okay, noted." is a real, complete reply
+    assert smooth_labels(w, labels) == labels
+
+
+def test_smooth_labels_absorbs_mid_sentence_fragment():
+    from app.merge import smooth_labels
+
+    w = _words("Thank you. I guess that's all the question from me.", 0, 0.3)
+    labels = ["B", "B", "A", "A", "A", "B", "B", "B", "B", "B"]
+    assert smooth_labels(w, labels) == ["B"] * 10

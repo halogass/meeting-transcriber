@@ -91,8 +91,9 @@ Environment variables:
 
 More Whisper models: `scripts/download_models.sh large-v3-turbo small-q5_1 large-v3` then pick them in Settings.
 
-**Speed** (GTX 1660 SUPER, 6 GB): the default `large-v3-turbo-q5_0` transcribes about 9x faster than real time
-(a 1-hour meeting in ~7 minutes); the full-precision `large-v3-turbo` gave the same words but was 2.5x slower.
+**Speed** (GTX 1660 SUPER, 6 GB, whisper and pyannote sharing one GPU): a 27-minute, 3-speaker meeting is
+fully processed (transcription + speaker identification) in under 5 minutes, about 5-6x faster than real time.
+The default `large-v3-turbo-q5_0` gave the same words as the full-precision `large-v3-turbo` in tests, 2.5x faster.
 
 ## How it works
 
@@ -109,7 +110,9 @@ call ──parec──► call.raw ─┘   (energy VAD)
 
 - `whisper-server` (from whisper.cpp) keeps the model loaded; the app talks to it over localhost HTTP.
 - Long recordings are transcribed in ~5-minute windows cut at silences.
-- Words are assigned to the pyannote speaker turn they overlap most; a sentence is split when the speaker changes.
+- Word timestamps come from whisper.cpp DTW alignment and are mapped back from the VAD-trimmed timeline.
+- Each word goes to the pyannote speaker turn it overlaps most; short mid-sentence islands are smoothed away
+  and speaker changes snap to the nearest sentence end.
 
 ## Development
 

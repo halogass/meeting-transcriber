@@ -49,6 +49,18 @@ class Segment:
     language: str = ""
 
 
+def dtw_preset(model_file: str) -> str | None:
+    """whisper.cpp DTW alignment-heads preset for a ggml model file name."""
+    name = model_file.removeprefix("ggml-").removesuffix(".bin")
+    base = name.split("-q")[0]  # drop quantization suffix (-q5_0, -q8_0)
+    presets = {
+        "tiny": "tiny", "tiny.en": "tiny.en", "base": "base", "base.en": "base.en", "small": "small",
+        "small.en": "small.en", "medium": "medium", "medium.en": "medium.en", "large-v1": "large.v1",
+        "large-v2": "large.v2", "large-v3": "large.v3", "large-v3-turbo": "large.v3.turbo",
+    }
+    return presets.get(base)
+
+
 def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -91,6 +103,9 @@ class WhisperServer:
             vad = config.model_path(s.vad_model)
             if vad.exists():
                 cmd += ["-vm", str(vad)]
+            preset = dtw_preset(self.model)
+            if preset:
+                cmd += ["-dtw", preset, "-nfa"]  # DTW word timestamps don't work with flash attention
             if self.gpu is None:
                 cmd += ["-ng"]
             else:
@@ -167,31 +182,69 @@ class WhisperServer:
         data = r.json()
         if "error" in data:
             raise RuntimeError(data["error"])
-        return parse_segments(data), data.get("language", "")
+        return parse_segments(data, vad=vad), data.get("language", "")
 
 
 def _clean_word(text: str) -> str:
     return text.replace("▁", " ")
 
 
-def parse_segments(data: dict) -> list[Segment]:
+def parse_segments(data: dict, vad: bool = False) -> list[Segment]:
+    """Parse whisper-server verbose_json.
+
+    Tokens are joined into whole words (" employ" + "." -> " employ."). Word start times use the
+    DTW timestamp when the server computes one (more precise than the token timestamps).
+    With VAD on, whisper.cpp maps segment times back onto the original timeline but leaves word
+    times in the VAD-compressed timeline, so word times are mapped onto their segment here.
+    """
     out: list[Segment] = []
     for seg in data.get("segments", []):
         text = (seg.get("text") or "").strip()
         if not text:
             continue
-        words = []
+        s0, s1 = float(seg.get("start", 0.0)), float(seg.get("end", 0.0))
+        raw = []  # (text, t0, t1, dtw or None, p)
         for w in seg.get("words") or []:
             wt = _clean_word(w.get("word", ""))
             # skip special tokens such as [_BEG_] or [_TT_123]
-            if not wt.strip() or (wt.strip().startswith("[_") and wt.strip().endswith("]")):
+            if not wt.strip() or (wt.strip().startswith("[_") and wt.strip().endswith("]")) or "start" not in w:
                 continue
-            if "start" in w:
-                words.append(Word(wt, float(w["start"]), float(w["end"]), float(w.get("probability", 1.0))))
+            dtw = w.get("t_dtw")
+            dtw = float(dtw) / 100 if isinstance(dtw, (int, float)) and dtw >= 0 else None
+            raw.append([wt, float(w["start"]), float(w["end"]), dtw, float(w.get("probability", 1.0))])
+        # join sub-word tokens / punctuation onto the previous word
+        merged: list[list] = []
+        for r in raw:
+            if merged and not r[0].startswith(" "):
+                m = merged[-1]
+                m[0] += r[0]
+                m[2] = max(m[2], r[2])
+                m[4] = min(m[4], r[4])
+            else:
+                merged.append(r)
+        words: list[Word] = []
+        if merged:
+            c0 = min(m[1] for m in merged)
+            c1 = max(m[2] for m in merged)
+            if vad and c1 - c0 > 0.05 and s1 > s0:
+                scale = (s1 - s0) / (c1 - c0)
+
+                def f(t: float) -> float:
+                    return s0 + (t - c0) * scale
+            else:
+                def f(t: float) -> float:
+                    return t
+            starts = [f(m[3] if m[3] is not None else m[1]) for m in merged]
+            for i in range(1, len(starts)):  # keep word starts ordered
+                starts[i] = max(starts[i], starts[i - 1])
+            for i, m in enumerate(merged):
+                nxt = starts[i + 1] if i + 1 < len(merged) else max(f(m[2]), starts[i])
+                end = min(max(f(m[2]), starts[i] + 0.02), max(nxt, starts[i] + 0.02))
+                words.append(Word(m[0], round(starts[i], 3), round(end, 3), m[4]))
         out.append(
             Segment(
-                start=float(seg.get("start", 0.0)),
-                end=float(seg.get("end", 0.0)),
+                start=s0,
+                end=s1,
                 text=text,
                 words=words,
                 no_speech_prob=float(seg.get("no_speech_prob", 0.0)),
